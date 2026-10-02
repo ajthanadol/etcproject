@@ -16,46 +16,58 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
-    html, body {
-      height: 100%;
+    html {
+      scroll-behavior: smooth;
+    }
+    body {
+      min-height: 100vh;
       overflow-x: hidden;
-      overflow-y: auto; /* เปิดให้เลื่อนหน้าจอแนวตั้งได้อย่างอิสระ */
+      overflow-y: auto;
       font-family: 'Sarabun', sans-serif;
       background-color: #f8fafc;
       color: #1e293b;
+      margin: 0;
+      padding: 0;
     }
+
     .card-stat { border-radius: 1rem; border: none; }
+    
     #spinner-overlay {
       position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-      background: rgba(255,255,255,0.75); z-index: 99999;
+      background: rgba(255,255,255,0.8); z-index: 99999;
       display: flex; justify-content: center; align-items: center; flex-direction: column;
     }
+    
     .badge-soft-success { background-color: #d1fae5; color: #065f46; }
     .badge-soft-warning { background-color: #fef3c7; color: #92400e; }
     .badge-soft-info { background-color: #e0f2fe; color: #075985; }
     .badge-soft-secondary { background-color: #f1f5f9; color: #475569; }
-    
-    /* สไตล์ Scrollbar ให้ดูเรียบหรู */
-    ::-webkit-scrollbar {
-      width: 8px;
-      height: 8px;
+
+    /* Scrollbar Style */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+    /* Responsive Scroll Containers */
+    .table-container-scroll {
+      width: 100%;
+      overflow-x: auto;
+      overflow-y: auto;
+      max-height: 580px;
+      -webkit-overflow-scrolling: touch;
+      border-radius: 0.75rem;
     }
-    ::-webkit-scrollbar-track {
-      background: #f1f5f9;
-    }
-    ::-webkit-scrollbar-thumb {
-      background: #cbd5e1;
-      border-radius: 4px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background: #94a3b8;
+    .table-container-scroll table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background-color: #f8fafc !important;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
     }
 
-    /* กล่องตารางให้มี scrollbar และขอบมน */
-    .table-responsive {
-      max-height: 520px;
-      overflow-y: auto;
-    }
+    .modal-dialog-scrollable .modal-content { max-height: 90vh; }
+    .modal-dialog-scrollable .modal-body { overflow-y: auto; max-height: calc(90vh - 140px); }
   </style>
 </head>
 <body>
@@ -97,8 +109,8 @@
     </div>
   </header>
 
-  <!-- หน้าเนื้อหาหลัก (กำหนด Padding Bottom ให้เลื่อนลงดูตารางได้สะดวก) -->
-  <main class="container-fluid px-4 py-4 mb-5">
+  <!-- หน้าเนื้อหาหลัก (Safe bottom padding) -->
+  <main class="container-fluid px-4 py-4" style="padding-bottom: 5rem !important;">
     
     <!-- แถบควบคุม Admin & สิทธิ์ผู้ใช้ (Admin Action Bar) -->
     <div id="admin-bar" class="card border-0 rounded-4 shadow-sm p-3 mb-4 bg-white" style="display: none;">
@@ -110,11 +122,14 @@
           <span class="badge bg-primary-subtle text-primary border rounded-pill small" id="lbl-role">Admin</span>
         </div>
         <div class="d-flex align-items-center gap-2 flex-wrap" id="role-buttons">
-          <button class="btn btn-sm text-white rounded-pill px-3" style="background-color: #059669;" onclick="openProjectModal()">
+          <button class="btn btn-sm text-white rounded-pill px-3" id="btn-add-prj" style="background-color: #059669;" onclick="openProjectModal()">
             + เพิ่มโครงการ
           </button>
           <button class="btn btn-sm text-white rounded-pill px-3" id="btn-add-fy" style="background-color: #d97706;" onclick="openFiscalYearModal()">
             + เพิ่มปีงบฯ
+          </button>
+          <button class="btn btn-sm text-white rounded-pill px-3" id="btn-members" style="background-color: #4f46e5;" onclick="openMembersModal()">
+            👥 จัดการสมาชิก
           </button>
           <button class="btn btn-sm btn-light border rounded-pill px-3 text-secondary" id="btn-settings" onclick="openSettingsModal()">
             ⚙️ ตั้งค่าระบบ
@@ -173,15 +188,15 @@
         </div>
         <span class="badge bg-light text-secondary border px-3 py-2 fw-normal">หน่วย: บาท (THB) เต็มจำนวน</span>
       </div>
-      <div style="height: 300px;"><canvas id="budgetChart"></canvas></div>
+      <div style="height: 320px;"><canvas id="budgetChart"></canvas></div>
     </div>
 
-    <!-- ตารางข้อมูลโครงการ (พร้อม Scrollbar เลื่อนดูได้สะดวก) -->
+    <!-- ตารางข้อมูลโครงการ (Scrollable & Responsive) -->
     <div class="card border-0 rounded-4 shadow-sm p-4 bg-white mb-5">
       <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
         <div>
           <h5 class="fw-bold mb-1">📋 ตารางข้อมูลโครงการทั้งหมด</h5>
-          <small class="text-muted">คลิกดูช่วงเวลา หรือเอกสารรายละเอียดของแต่ละโครงการ (เลื่อนขึ้น-ลงเพื่อดูข้อมูลเพิ่มเติมได้)</small>
+          <small class="text-muted">คลิกดูช่วงเวลา หรือเอกสารรายละเอียดของแต่ละโครงการ (เลื่อนดูข้อมูลได้ทั้งแนวตั้งและแนวนอน)</small>
         </div>
         <div class="d-flex gap-2">
           <input type="text" id="search-box" class="form-control form-control-sm rounded-pill px-3" placeholder="🔍 ค้นหาโครงการ..." oninput="renderTable()">
@@ -191,18 +206,18 @@
         </div>
       </div>
 
-      <div class="table-responsive border rounded-3">
+      <div class="table-container-scroll border">
         <table class="table table-hover align-middle mb-0">
-          <thead class="table-light text-secondary small sticky-top">
+          <thead class="table-light text-secondary small">
             <tr>
-              <th style="min-width: 260px;">รหัส/ชื่อโครงการ</th>
-              <th>ผู้รับผิดชอบ</th>
-              <th class="text-center">ปีงบฯ</th>
-              <th class="text-end">งบตามแผน</th>
-              <th class="text-end">งบอนุมัติ</th>
-              <th class="text-end">เบิกจ่ายจริง</th>
-              <th class="text-center">สถานะ</th>
-              <th class="text-center">การจัดการ/เอกสาร</th>
+              <th style="min-width: 280px;">รหัส/ชื่อโครงการ</th>
+              <th style="min-width: 180px;">ผู้รับผิดชอบ</th>
+              <th class="text-center" style="min-width: 90px;">ปีงบฯ</th>
+              <th class="text-end" style="min-width: 120px;">งบตามแผน</th>
+              <th class="text-end" style="min-width: 120px;">งบอนุมัติ</th>
+              <th class="text-end" style="min-width: 120px;">เบิกจ่ายจริง</th>
+              <th class="text-center" style="min-width: 140px;">สถานะ</th>
+              <th class="text-center" style="min-width: 180px;">การจัดการ/เอกสาร</th>
             </tr>
           </thead>
           <tbody id="projects-table-body"></tbody>
@@ -224,11 +239,112 @@
           <h5 class="fw-bold mb-1">เข้าสู่ระบบผู้ใช้งาน</h5>
           <p class="text-muted small mb-3">กรอก Username และ Password ที่กำหนดไว้</p>
           <form onsubmit="handleLogin(event)">
-            <input type="text" id="login-user" class="form-control rounded-3 mb-2" placeholder="Username (เช่น adminetc)" required>
+            <input type="text" id="login-user" class="form-control rounded-3 mb-2" placeholder="Username (เช่น admin)" required>
             <input type="password" id="login-pass" class="form-control rounded-3 mb-3" placeholder="Password" required>
             <button type="submit" class="btn btn-primary rounded-pill w-100 py-2" style="background:#4f46e5; border-color:#4f46e5;">เข้าสู่ระบบ</button>
           </form>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: จัดการสมาชิกและการกำหนดสิทธิ์ (แสดงครบทุกบทบาท) -->
+  <div class="modal fade" id="modalMembers" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-content rounded-4 border-0 shadow-lg p-3">
+        
+        <div class="modal-header border-0 pb-0">
+          <div>
+            <h5 class="modal-title fw-bold text-dark d-flex align-items-center gap-2 mb-1">
+              <span style="color: #4f46e5;"><i class="bi bi-people-fill"></i></span> จัดการสมาชิกและการกำหนดสิทธิ์
+            </h5>
+            <small class="text-muted">Admin กำหนด Username, Password, และสิทธิ์การใช้งานของสมาชิก</small>
+          </div>
+          <button type="button" class="btn-close rounded-circle p-2 bg-light" data-bs-dismiss="modal"></button>
+        </div>
+
+        <div class="modal-body">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="fw-bold mb-0 text-dark">สมาชิกทั้งหมด</h6>
+            <button class="btn btn-primary rounded-pill px-3 py-1 small" style="background-color: #4338ca; border-color: #4338ca;" onclick="openUserFormModal()">
+              + เพิ่มสมาชิก
+            </button>
+          </div>
+
+          <div class="table-container-scroll border rounded-3">
+            <table class="table table-hover align-middle mb-0">
+              <thead class="table-light text-secondary small">
+                <tr>
+                  <th style="min-width: 220px;">สมาชิก</th>
+                  <th style="min-width: 180px;">Username / รหัสผ่าน</th>
+                  <th style="min-width: 180px;">บทบาท</th>
+                  <th class="text-center" style="min-width: 70px;">สร้าง</th>
+                  <th class="text-center" style="min-width: 70px;">แก้ไข</th>
+                  <th class="text-center" style="min-width: 70px;">ลบ</th>
+                  <th class="text-center" style="min-width: 100px;">สิทธิ์ Admin</th>
+                  <th class="text-center" style="min-width: 130px;">จัดการ</th>
+                </tr>
+              </thead>
+              <tbody id="members-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="modal-footer border-0 pt-0">
+          <button type="button" class="btn btn-light rounded-pill px-4 text-secondary" data-bs-dismiss="modal">
+            ปิดหน้าต่าง
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL ย่อย: ฟอร์มเพิ่ม/แก้ไขสมาชิก -->
+  <div class="modal fade" id="modalUserForm" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 480px;">
+      <div class="modal-content border-0 rounded-4 shadow-lg p-3">
+        <form onsubmit="handleSaveUser(event)">
+          <div class="modal-header border-0 pb-0">
+            <h5 class="modal-title fw-bold text-dark" id="user-form-title">เพิ่มสมาชิกใหม่</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body row g-3">
+            <input type="hidden" id="u-id">
+            <div class="col-12">
+              <label class="form-label small fw-bold">ชื่อ-นามสกุล <span class="text-danger">*</span></label>
+              <input type="text" id="u-name" class="form-control rounded-3" placeholder="เช่น ผศ.ดร.สมชาย ใจดี" required>
+            </div>
+            <div class="col-12">
+              <label class="form-label small fw-bold">อีเมล (@msu.ac.th) <span class="text-danger">*</span></label>
+              <input type="email" id="u-email" class="form-control rounded-3" placeholder="example@msu.ac.th" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-bold">Username <span class="text-danger">*</span></label>
+              <input type="text" id="u-username" class="form-control rounded-3" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-bold">Password <span class="text-danger">*</span></label>
+              <input type="text" id="u-password" class="form-control rounded-3" required>
+            </div>
+            <div class="col-12">
+              <label class="form-label small fw-bold">บทบาท/สิทธิ์การใช้งาน <span class="text-danger">*</span></label>
+              <select id="u-role" class="form-select rounded-3" required>
+                <option value="Admin">Admin (ผู้ดูแลระบบ)</option>
+                <option value="Head">หัวหน้าภาควิชาฯ (Head)</option>
+                <option value="Secretary">เจ้าหน้าที่/เลขาฯ (Secretary)</option>
+                <option value="Lecturer">อาจารย์ (Lecturer)</option>
+                <option value="Student">นิสิต (Student)</option>
+              </select>
+            </div>
+          </div>
+          <div class="modal-footer border-0 pt-0">
+            <button type="button" class="btn btn-light rounded-pill px-3" data-bs-dismiss="modal">ยกเลิก</button>
+            <button type="submit" class="btn btn-primary rounded-pill px-4" style="background-color: #4338ca; border-color: #4338ca;">
+              บันทึกสมาชิก
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   </div>
@@ -324,7 +440,7 @@
     </div>
   </div>
 
-  <!-- MODAL: ฟอร์มเพิ่ม/แก้ไขโครงการ (SDG และ Category เป็นช่องกรอกข้อความ พร้อม Datalist) -->
+  <!-- MODAL: ฟอร์มเพิ่ม/แก้ไขโครงการ -->
   <div class="modal fade" id="modalProjectForm" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
       <div class="modal-content rounded-4 border-0 shadow-lg p-3">
@@ -337,8 +453,6 @@
           </div>
           
           <div class="modal-body row g-3">
-            
-            <!-- รหัสโครงการ & ปีงบฯ -->
             <div class="col-md-6">
               <label class="form-label small fw-bold text-secondary">รหัสโครงการ (Code) <span class="text-danger">*</span></label>
               <input type="text" id="p-code" class="form-control rounded-3" placeholder="เช่น ETC-69-01" required>
@@ -347,14 +461,10 @@
               <label class="form-label small fw-bold text-secondary">ปีงบประมาณ <span class="text-danger">*</span></label>
               <input type="number" id="p-year" class="form-control rounded-3" placeholder="2569" required>
             </div>
-
-            <!-- ชื่อโครงการ -->
             <div class="col-12">
               <label class="form-label small fw-bold text-secondary">ชื่อโครงการ (Title) <span class="text-danger">*</span></label>
               <input type="text" id="p-title" class="form-control rounded-3" placeholder="ระบุชื่อโครงการเต็ม..." required>
             </div>
-
-            <!-- งบประมาณ 3 ช่อง -->
             <div class="col-md-4">
               <label class="form-label small fw-bold text-secondary">💰 งบจัดสรรตามแผน <span class="text-danger">*</span></label>
               <input type="number" id="p-plan" class="form-control rounded-3" placeholder="0" required>
@@ -367,14 +477,10 @@
               <label class="form-label small fw-bold text-warning-emphasis">💳 เบิกจ่ายจริงสะสม</label>
               <input type="number" id="p-spent" class="form-control rounded-3" placeholder="0">
             </div>
-
-            <!-- วัตถุประสงค์ -->
             <div class="col-12">
               <label class="form-label small fw-bold text-secondary">🎯 วัตถุประสงค์ของโครงการ</label>
               <textarea id="p-obj" class="form-control rounded-3" rows="2" placeholder="1) เพื่อ..."></textarea>
             </div>
-
-            <!-- ประเภทโครงการ (Category) เป็นช่องกรอกข้อความ -->
             <div class="col-12">
               <label class="form-label small fw-bold text-secondary">ประเภทโครงการ (Category) <span class="text-danger">*</span></label>
               <input type="text" id="p-category" class="form-control rounded-3" list="category-suggestions" 
@@ -387,8 +493,6 @@
                 <option value="โครงการวิจัยและบริการวิชาการเพื่อการพัฒนาท้องถิ่น">
               </datalist>
             </div>
-
-            <!-- ความสอดคล้องเป้าหมาย SDG (ปรับเป็นช่องกรอกข้อความ พร้อม Datalist แนะนำ) -->
             <div class="col-12">
               <label class="form-label small fw-bold text-secondary">🎋 ความสอดคล้องเป้าหมาย SDG</label>
               <input type="text" id="p-sdg" class="form-control rounded-3" list="sdg-suggestions" 
@@ -401,8 +505,6 @@
                 <option value="SO5 บริหารจัดการองค์กรด้วยหลักธรรมาภิบาลและการเปลี่ยนแปลงสู่ดิจิทัล">
               </datalist>
             </div>
-
-            <!-- กล่องเลือกวัน-เวลา เริ่มต้นและสิ้นสุดโครงการ -->
             <div class="col-md-6">
               <div class="card p-3 rounded-4 border bg-light-subtle h-100 shadow-none">
                 <label class="form-label small fw-bold text-secondary d-flex align-items-center gap-1">
@@ -421,10 +523,8 @@
                 <div class="small text-primary mt-2 fw-medium" id="lbl-thai-end">เวลาไทย: -</div>
               </div>
             </div>
-
-            <!-- ผู้รับผิดชอบ & สถานะ -->
             <div class="col-md-6">
-              <label class="form-label small fw-bold text-secondary">ผู้รับผิดชอบโครงการ (เลือกจากฐานข้อมูลสมาชิก) <span class="text-danger">*</span></label>
+              <label class="form-label small fw-bold text-secondary">ผู้รับผิดชอบโครงการ <span class="text-danger">*</span></label>
               <select id="p-resp" class="form-select rounded-3" required></select>
             </div>
             <div class="col-md-6">
@@ -436,8 +536,6 @@
                 <option value="ยกเลิกโครงการ">ยกเลิกโครงการ</option>
               </select>
             </div>
-
-            <!-- ลิงก์ Google Drive รวมโครงการ -->
             <div class="col-12">
               <div class="d-flex justify-content-between align-items-center mb-1">
                 <label class="form-label small fw-bold text-secondary mb-0">โฟลเดอร์ Google Drive รวมโครงการ</label>
@@ -445,14 +543,10 @@
               </div>
               <input type="url" id="p-drive" class="form-control rounded-3" placeholder="https://drive.google.com/drive/folders/...">
             </div>
-
-            <!-- ช่องหมายเหตุ (Remarks) -->
             <div class="col-12">
               <label class="form-label small fw-bold text-secondary">📝 หมายเหตุเพิ่มเติม</label>
               <textarea id="p-remarks" class="form-control rounded-3" rows="2" placeholder="ระบุรายละเอียดเพิ่มเติม หรือข้อตกลงเฉพาะ..."></textarea>
             </div>
-
-            <!-- การแนบไฟล์เอกสารตัวอย่าง -->
             <div class="col-12 border-top pt-3">
               <div class="d-flex justify-content-between align-items-center mb-2">
                 <label class="form-label small fw-bold text-secondary mb-0">📁 ไฟล์โครงการตัวอย่าง (Project Files)</label>
@@ -460,14 +554,11 @@
                   + เพิ่มไฟล์
                 </button>
               </div>
-              
               <div id="fileUploadContainer" class="d-flex flex-column gap-2 mb-2"></div>
-              
               <div class="card border rounded-3 p-3 text-center text-muted small bg-light" id="emptyFileAlert">
                 ยังไม่มีไฟล์เอกสารตัวอย่างสำหรับโครงการนี้ คลิก "+ เพิ่มไฟล์" เพื่อแทรกเอกสาร
               </div>
             </div>
-
           </div>
 
           <div class="modal-footer border-0 pt-0 d-flex justify-content-end gap-2">
@@ -668,7 +759,7 @@
           <tr>
             <td>
               <span class="badge bg-primary-subtle text-primary border rounded-pill px-2 py-1 mb-1">${p.code}</span>
-              <div class="fw-medium small text-truncate" style="max-width: 300px;">${p.title}</div>
+              <div class="fw-medium small text-truncate" style="max-width: 320px;" title="${p.title}">${p.title}</div>
             </td>
             <td>${p.responsible_name}</td>
             <td class="text-center">${p.fiscal_year}</td>
@@ -814,6 +905,173 @@
       }
     }
 
+    // ---------------------------------------------------------
+    // โมดูลจัดการสมาชิก (User Management Functions)
+    // ---------------------------------------------------------
+    async function openMembersModal() {
+      toggleSpinner(true);
+      try {
+        const res = await fetch(`${API_URL}?action=getUsersList`);
+        const result = await res.json();
+        if (result.status === 'success') {
+          renderMembersTable(result.users);
+          new bootstrap.Modal(document.getElementById('modalMembers')).show();
+        } else {
+          alert('ไม่สามารถโหลดข้อมูลสมาชิกได้: ' + result.message);
+        }
+      } catch (err) {
+        alert('เกิดข้อผิดพลาดในการโหลดข้อมูลสมาชิก');
+      } finally {
+        toggleSpinner(false);
+      }
+    }
+
+    function renderMembersTable(usersList) {
+      const tbody = document.getElementById('members-table-body');
+      
+      tbody.innerHTML = usersList.map(u => {
+        let roleBadge = '';
+        if (u.role === 'Admin') {
+          roleBadge = '<span class="badge bg-primary-subtle text-primary border rounded-pill px-3 py-1">Admin</span>';
+        } else if (u.role === 'Head') {
+          roleBadge = '<span class="badge bg-primary-subtle text-primary border rounded-pill px-3 py-1">หัวหน้าภาควิชาฯ (Head)</span>';
+        } else if (u.role === 'Secretary') {
+          roleBadge = '<span class="badge bg-info-subtle text-info-emphasis border rounded-pill px-3 py-1">เจ้าหน้าที่/เลขาฯ (Secretary)</span>';
+        } else if (u.role === 'Lecturer') {
+          roleBadge = '<span class="badge bg-primary-subtle text-primary border rounded-pill px-3 py-1">อาจารย์ (Lecturer)</span>';
+        } else if (u.role === 'Student') {
+          roleBadge = '<span class="badge bg-secondary-subtle text-secondary border rounded-pill px-3 py-1">นิสิต (Student)</span>';
+        } else {
+          roleBadge = `<span class="badge bg-light text-dark border rounded-pill px-3 py-1">${u.role}</span>`;
+        }
+
+        const checkIcon = '<span class="text-success fs-5">☑</span>';
+        const crossIcon = '<span class="text-danger fs-5">☒</span>';
+
+        // กำหนดสิทธิ์ตาม Role Matrix
+        const canCreate = (['Admin', 'Head', 'Secretary', 'Lecturer'].includes(u.role)) ? checkIcon : crossIcon;
+        const canEdit = (['Admin', 'Head', 'Secretary', 'Lecturer', 'Student'].includes(u.role)) ? checkIcon : crossIcon;
+        const canDelete = (['Admin', 'Head'].includes(u.role)) ? checkIcon : crossIcon;
+        const isAdmin = (u.role === 'Admin') ? checkIcon : crossIcon;
+
+        return `
+          <tr>
+            <td>
+              <div class="fw-bold text-dark">${u.name}</div>
+              <small class="text-muted">${u.email}</small>
+            </td>
+            <td>
+              <div class="fw-semibold text-primary">${u.username}</div>
+              <small class="text-muted">รหัสผ่าน: ${u.password}</small>
+            </td>
+            <td>${roleBadge}</td>
+            <td class="text-center">${canCreate}</td>
+            <td class="text-center">${canEdit}</td>
+            <td class="text-center">${canDelete}</td>
+            <td class="text-center">${isAdmin}</td>
+            <td class="text-center small">
+              <a href="javascript:void(0)" class="text-primary fw-medium text-decoration-none me-2" onclick="editUser('${u.user_id}', '${encodeURIComponent(u.name)}', '${u.email}', '${u.username}', '${u.password}', '${u.role}')">
+                กำหนดสิทธิ์
+              </a>
+              <a href="javascript:void(0)" class="text-danger fw-medium text-decoration-none" onclick="deleteUser('${u.user_id}', '${encodeURIComponent(u.name)}')">
+                ลบ
+              </a>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function openUserFormModal() {
+      document.getElementById('user-form-title').innerText = 'เพิ่มสมาชิกใหม่';
+      document.getElementById('u-id').value = '';
+      document.getElementById('u-name').value = '';
+      document.getElementById('u-email').value = '';
+      document.getElementById('u-username').value = '';
+      document.getElementById('u-password').value = '';
+      document.getElementById('u-role').value = 'Lecturer';
+      new bootstrap.Modal(document.getElementById('modalUserForm')).show();
+    }
+
+    function editUser(userId, nameEnc, email, username, password, role) {
+      document.getElementById('user-form-title').innerText = 'แก้ไขข้อมูลและกำหนดสิทธิ์สมาชิก';
+      document.getElementById('u-id').value = userId;
+      document.getElementById('u-name').value = decodeURIComponent(nameEnc);
+      document.getElementById('u-email').value = email;
+      document.getElementById('u-username').value = username;
+      document.getElementById('u-password').value = password;
+      document.getElementById('u-role').value = role;
+      new bootstrap.Modal(document.getElementById('modalUserForm')).show();
+    }
+
+    async function handleSaveUser(e) {
+      e.preventDefault();
+      toggleSpinner(true);
+
+      const payload = {
+        action: 'saveUser',
+        actor_role: state.user.role,
+        user: {
+          user_id: document.getElementById('u-id').value,
+          name: document.getElementById('u-name').value.trim(),
+          email: document.getElementById('u-email').value.trim(),
+          username: document.getElementById('u-username').value.trim(),
+          password: document.getElementById('u-password').value.trim(),
+          role: document.getElementById('u-role').value,
+          status: 'Active'
+        }
+      };
+
+      try {
+        const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) });
+        const result = await res.json();
+        if (result.status === 'success') {
+          bootstrap.Modal.getInstance(document.getElementById('modalUserForm')).hide();
+          alert('บันทึกข้อมูลสมาชิกสำเร็จ');
+          const reloadRes = await fetch(`${API_URL}?action=getUsersList`);
+          const reloadData = await reloadRes.json();
+          if (reloadData.status === 'success') renderMembersTable(reloadData.users);
+          loadRemoteData();
+        } else {
+          alert(result.message);
+        }
+      } catch (err) {
+        alert('เกิดข้อผิดพลาดในการบันทึกข้อมูลสมาชิก');
+      } finally {
+        toggleSpinner(false);
+      }
+    }
+
+    async function deleteUser(userId, nameEnc) {
+      const name = decodeURIComponent(nameEnc);
+      if (!confirm(`ยืนยันการลบสมาชิก "${name}" ใช่หรือไม่?`)) return;
+
+      toggleSpinner(true);
+      try {
+        const res = await fetch(API_URL, {
+          method: 'POST',
+          body: JSON.stringify({ action: 'deleteUser', user_id: userId, actor_role: state.user.role })
+        });
+        const result = await res.json();
+        if (result.status === 'success') {
+          alert('ลบสมาชิกเรียบร้อย');
+          const reloadRes = await fetch(`${API_URL}?action=getUsersList`);
+          const reloadData = await reloadRes.json();
+          if (reloadData.status === 'success') renderMembersTable(reloadData.users);
+          loadRemoteData();
+        } else {
+          alert(result.message);
+        }
+      } catch (err) {
+        alert('ไม่สามารถลบสมาชิกได้');
+      } finally {
+        toggleSpinner(false);
+      }
+    }
+
+    // ---------------------------------------------------------
+    // ฟังก์ชันจัดการโครงการและไฟล์แนบ
+    // ---------------------------------------------------------
     function addFileRow() {
       const container = document.getElementById('fileUploadContainer');
       const alertBox = document.getElementById('emptyFileAlert');
@@ -967,6 +1225,9 @@
       window.open(url, '_blank');
     }
 
+    // ---------------------------------------------------------
+    // Authentication & State Sync
+    // ---------------------------------------------------------
     function openLoginModal() { new bootstrap.Modal(document.getElementById('modalLogin')).show(); }
 
     async function handleLogin(e) {
@@ -1007,7 +1268,9 @@
     function syncAuthState() {
       const adminBar = document.getElementById('admin-bar');
       const authActions = document.getElementById('auth-actions');
+      const btnAddPrj = document.getElementById('btn-add-prj');
       const btnAddFy = document.getElementById('btn-add-fy');
+      const btnMembers = document.getElementById('btn-members');
       const btnSettings = document.getElementById('btn-settings');
 
       if (state.user) {
@@ -1017,7 +1280,12 @@
         document.getElementById('lbl-role').innerText = state.user.role;
 
         const isAdmin = state.user.role === 'Admin';
+        const isStudent = state.user.role === 'Student';
+
+        // ปรับการมองเห็นปุ่มตามสิทธิ์
+        btnAddPrj.style.display = isStudent ? 'none' : 'inline-block';
         btnAddFy.style.display = isAdmin ? 'inline-block' : 'none';
+        btnMembers.style.display = isAdmin ? 'inline-block' : 'none';
         btnSettings.style.display = isAdmin ? 'inline-block' : 'none';
       } else {
         adminBar.style.display = 'none';
@@ -1143,7 +1411,15 @@
 
     function populateRespSelect() {
       const select = document.getElementById('p-resp');
-      select.innerHTML = state.users.map(u => `<option value="${u.user_id}">${u.name} (${u.role})</option>`).join('');
+      select.innerHTML = state.users.map(u => {
+        let roleName = u.role;
+        if (u.role === 'Admin') roleName = 'ผู้ดูแลระบบ';
+        else if (u.role === 'Head') roleName = 'หัวหน้าภาคฯ';
+        else if (u.role === 'Secretary') roleName = 'เจ้าหน้าที่/เลขาฯ';
+        else if (u.role === 'Lecturer') roleName = 'อาจารย์';
+        else if (u.role === 'Student') roleName = 'นิสิต';
+        return `<option value="${u.user_id}">${u.name} (${roleName})</option>`;
+      }).join('');
     }
   </script>
 </body>
