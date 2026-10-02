@@ -16,7 +16,10 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
-    body {
+    html, body {
+      height: 100%;
+      overflow-x: hidden;
+      overflow-y: auto; /* เปิดให้เลื่อนหน้าจอแนวตั้งได้อย่างอิสระ */
       font-family: 'Sarabun', sans-serif;
       background-color: #f8fafc;
       color: #1e293b;
@@ -31,6 +34,28 @@
     .badge-soft-warning { background-color: #fef3c7; color: #92400e; }
     .badge-soft-info { background-color: #e0f2fe; color: #075985; }
     .badge-soft-secondary { background-color: #f1f5f9; color: #475569; }
+    
+    /* สไตล์ Scrollbar ให้ดูเรียบหรู */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+
+    /* กล่องตารางให้มี scrollbar และขอบมน */
+    .table-responsive {
+      max-height: 520px;
+      overflow-y: auto;
+    }
   </style>
 </head>
 <body>
@@ -72,7 +97,8 @@
     </div>
   </header>
 
-  <main class="container-fluid px-4 py-4">
+  <!-- หน้าเนื้อหาหลัก (กำหนด Padding Bottom ให้เลื่อนลงดูตารางได้สะดวก) -->
+  <main class="container-fluid px-4 py-4 mb-5">
     
     <!-- แถบควบคุม Admin & สิทธิ์ผู้ใช้ (Admin Action Bar) -->
     <div id="admin-bar" class="card border-0 rounded-4 shadow-sm p-3 mb-4 bg-white" style="display: none;">
@@ -150,12 +176,12 @@
       <div style="height: 300px;"><canvas id="budgetChart"></canvas></div>
     </div>
 
-    <!-- ตารางข้อมูลโครงการ -->
-    <div class="card border-0 rounded-4 shadow-sm p-4 bg-white">
+    <!-- ตารางข้อมูลโครงการ (พร้อม Scrollbar เลื่อนดูได้สะดวก) -->
+    <div class="card border-0 rounded-4 shadow-sm p-4 bg-white mb-5">
       <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
         <div>
           <h5 class="fw-bold mb-1">📋 ตารางข้อมูลโครงการทั้งหมด</h5>
-          <small class="text-muted">คลิกดูช่วงเวลา หรือเอกสารรายละเอียดของแต่ละโครงการ</small>
+          <small class="text-muted">คลิกดูช่วงเวลา หรือเอกสารรายละเอียดของแต่ละโครงการ (เลื่อนขึ้น-ลงเพื่อดูข้อมูลเพิ่มเติมได้)</small>
         </div>
         <div class="d-flex gap-2">
           <input type="text" id="search-box" class="form-control form-control-sm rounded-pill px-3" placeholder="🔍 ค้นหาโครงการ..." oninput="renderTable()">
@@ -165,9 +191,9 @@
         </div>
       </div>
 
-      <div class="table-responsive">
-        <table class="table table-hover align-middle">
-          <thead class="table-light text-secondary small">
+      <div class="table-responsive border rounded-3">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light text-secondary small sticky-top">
             <tr>
               <th style="min-width: 260px;">รหัส/ชื่อโครงการ</th>
               <th>ผู้รับผิดชอบ</th>
@@ -298,7 +324,7 @@
     </div>
   </div>
 
-  <!-- MODAL: ฟอร์มเพิ่ม/แก้ไขโครงการ (ช่องกรอก Category เป็น Text Input + Datalist) -->
+  <!-- MODAL: ฟอร์มเพิ่ม/แก้ไขโครงการ (SDG และ Category เป็นช่องกรอกข้อความ พร้อม Datalist) -->
   <div class="modal fade" id="modalProjectForm" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
       <div class="modal-content rounded-4 border-0 shadow-lg p-3">
@@ -348,7 +374,7 @@
               <textarea id="p-obj" class="form-control rounded-3" rows="2" placeholder="1) เพื่อ..."></textarea>
             </div>
 
-            <!-- ประเภทโครงการ (Category) เป็นช่องกรอกข้อความ พร้อม Datalist แนะนำ -->
+            <!-- ประเภทโครงการ (Category) เป็นช่องกรอกข้อความ -->
             <div class="col-12">
               <label class="form-label small fw-bold text-secondary">ประเภทโครงการ (Category) <span class="text-danger">*</span></label>
               <input type="text" id="p-category" class="form-control rounded-3" list="category-suggestions" 
@@ -362,17 +388,18 @@
               </datalist>
             </div>
 
-            <!-- ความสอดคล้องเป้าหมาย SDG (Dropdown List SO) -->
+            <!-- ความสอดคล้องเป้าหมาย SDG (ปรับเป็นช่องกรอกข้อความ พร้อม Datalist แนะนำ) -->
             <div class="col-12">
               <label class="form-label small fw-bold text-secondary">🎋 ความสอดคล้องเป้าหมาย SDG</label>
-              <select id="p-sdg" class="form-select rounded-3">
-                <option value="">-- เลือกเป้าหมายความสอดคล้องยุทธศาสตร์ (SO) --</option>
-                <option value="SO1 จัดการศึกษาที่สอดคล้องกับความต้องการของชาติและนานาชาติ">SO1 จัดการศึกษาที่สอดคล้องกับความต้องการของชาติและนานาชาติ</option>
-                <option value="SO2 พัฒนางานวิจัยและนวัตกรรมเพื่อการพัฒนาเชิงพื้นที่และสร้างมูลค่า">SO2 พัฒนางานวิจัยและนวัตกรรมเพื่อการพัฒนาเชิงพื้นที่และสร้างมูลค่า</option>
-                <option value="SO3 บริการวิชาการเพื่อพัฒนาคุณภาพชีวิตและยกระดับชุมชนอย่างยั่งยืน">SO3 บริการวิชาการเพื่อพัฒนาคุณภาพชีวิตและยกระดับชุมชนอย่างยั่งยืน</option>
-                <option value="SO4 ทำนุบำรุงศิลปวัฒนธรรมและภูมิปัญญาท้องถิ่นสู่นานาชาติ">SO4 ทำนุบำรุงศิลปวัฒนธรรมและภูมิปัญญาท้องถิ่นสู่นานาชาติ</option>
-                <option value="SO5 บริหารจัดการองค์กรด้วยหลักธรรมาภิบาลและการเปลี่ยนแปลงสู่ดิจิทัล">SO5 บริหารจัดการองค์กรด้วยหลักธรรมาภิบาลและการเปลี่ยนแปลงสู่ดิจิทัล</option>
-              </select>
+              <input type="text" id="p-sdg" class="form-control rounded-3" list="sdg-suggestions" 
+                     placeholder="พิมพ์ระบุเป้าหมาย SDG หรือเลือกเป้าหมายยุทธศาสตร์ (SO)...">
+              <datalist id="sdg-suggestions">
+                <option value="SO1 จัดการศึกษาที่สอดคล้องกับความต้องการของชาติและนานาชาติ">
+                <option value="SO2 พัฒนางานวิจัยและนวัตกรรมเพื่อการพัฒนาเชิงพื้นที่และสร้างมูลค่า">
+                <option value="SO3 บริการวิชาการเพื่อพัฒนาคุณภาพชีวิตและยกระดับชุมชนอย่างยั่งยืน">
+                <option value="SO4 ทำนุบำรุงศิลปวัฒนธรรมและภูมิปัญญาท้องถิ่นสู่นานาชาติ">
+                <option value="SO5 บริหารจัดการองค์กรด้วยหลักธรรมาภิบาลและการเปลี่ยนแปลงสู่ดิจิทัล">
+              </datalist>
             </div>
 
             <!-- กล่องเลือกวัน-เวลา เริ่มต้นและสิ้นสุดโครงการ -->
@@ -905,7 +932,7 @@
           spent_budget: document.getElementById('p-spent').value,
           objective: document.getElementById('p-obj').value.trim(),
           category: document.getElementById('p-category').value.trim(),
-          sdg: document.getElementById('p-sdg').value,
+          sdg: document.getElementById('p-sdg').value.trim(),
           start_date: document.getElementById('p-start-date').value,
           end_date: document.getElementById('p-end-date').value,
           status: document.getElementById('p-status').value,
