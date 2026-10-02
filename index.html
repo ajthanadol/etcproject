@@ -34,7 +34,7 @@
     
     #spinner-overlay {
       position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-      background: rgba(255,255,255,0.8); z-index: 99999;
+      background: rgba(255,255,255,0.85); z-index: 99999;
       display: flex; justify-content: center; align-items: center; flex-direction: column;
     }
     
@@ -109,7 +109,7 @@
     </div>
   </header>
 
-  <!-- หน้าเนื้อหาหลัก (Safe bottom padding) -->
+  <!-- หน้าเนื้อหาหลัก (Safe bottom padding 5rem) -->
   <main class="container-fluid px-4 py-4" style="padding-bottom: 5rem !important;">
     
     <!-- แถบควบคุม Admin & สิทธิ์ผู้ใช้ (Admin Action Bar) -->
@@ -142,7 +142,7 @@
       </div>
     </div>
 
-    <!-- การ์ดงบประมาณจำแนกตามปี -->
+    <!-- การ์ดงบประมาณจำแนกตามปี พร้อมยอดคงเหลือจัดสรรเพิ่ม -->
     <h6 class="fw-bold mb-3 d-flex align-items-center gap-2">
       <span>📊</span> งบประมาณจัดสรรรวมจำแนกตามปีงบประมาณ
     </h6>
@@ -249,7 +249,7 @@
     </div>
   </div>
 
-  <!-- MODAL: จัดการสมาชิกและการกำหนดสิทธิ์ (มีคอลัมน์ขอบเขตโครงการ) -->
+  <!-- MODAL: จัดการสมาชิกและการกำหนดสิทธิ์ -->
   <div class="modal fade" id="modalMembers" tabindex="-1">
     <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
       <div class="modal-content rounded-4 border-0 shadow-lg p-3">
@@ -302,7 +302,7 @@
     </div>
   </div>
 
-  <!-- MODAL ย่อย: ฟอร์มเพิ่ม/แก้ไขสมาชิก (เพิ่มตัวเลือกขอบเขตโครงการ) -->
+  <!-- MODAL ย่อย: ฟอร์มเพิ่ม/แก้ไขสมาชิก (เพิ่มขอบเขตโครงการ) -->
   <div class="modal fade" id="modalUserForm" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered" style="max-width: 500px;">
       <div class="modal-content border-0 rounded-4 shadow-lg p-3">
@@ -340,7 +340,7 @@
               </select>
             </div>
 
-            <!-- ฟีเจอร์กำหนดสิทธิ์: สิทธิ์เฉพาะโครงการที่ตนเองรับผิดชอบเท่านั้น -->
+            <!-- กำหนดขอบเขตโครงการ -->
             <div class="col-12">
               <div class="card p-3 rounded-3 border bg-light-subtle">
                 <label class="form-label small fw-bold text-dark mb-1">
@@ -672,6 +672,7 @@
       }
     }
 
+    // ฟังก์ชันคำนวณเงินคงเหลือจัดสรรเพิ่มรายปี (Allocated - Approved)
     function renderStats() {
       const total = state.projects.length;
       const active = state.projects.filter(p => p.status === 'อยู่ระหว่างดำเนินงาน').length;
@@ -690,23 +691,41 @@
       document.getElementById('stat-approved-pct').innerText = `${apprPct}% ของงบตามแผน`;
       document.getElementById('stat-spent-pct').innerText = `เบิกจ่ายแล้ว ${spentPct}% ของงบอกุมัติ`;
 
+      // การ์ดงบประมาณรายปี พร้อมคำนวณเงินคงเหลือเพื่อจัดสรรโครงการเพิ่ม
       const fyContainer = document.getElementById('fiscal-cards-container');
       fyContainer.innerHTML = state.fiscalYears.map(fy => {
         const fyProjects = state.projects.filter(p => String(p.fiscal_year) === String(fy.fiscal_year));
-        const fySpent = fyProjects.reduce((a, b) => a + (Number(b.spent_budget) || 0), 0);
+        const fyAllocated = Number(fy.allocated_budget) || 0;
         const fyAppr = fyProjects.reduce((a, b) => a + (Number(b.approved_budget) || 0), 0);
+        const fySpent = fyProjects.reduce((a, b) => a + (Number(b.spent_budget) || 0), 0);
+
+        // คำนวณเงินคงเหลือจัดสรรเพิ่ม
+        const fyRemaining = fyAllocated - fyAppr;
+
+        let remainingBadge = '';
+        if (fyRemaining > 0) {
+          remainingBadge = `<span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill">คงเหลือจัดสรรเพิ่มได้ ฿${fyRemaining.toLocaleString()}</span>`;
+        } else if (fyRemaining === 0) {
+          remainingBadge = `<span class="badge bg-secondary-subtle text-secondary rounded-pill">จัดสรรเต็มวงเงินแล้ว</span>`;
+        } else {
+          remainingBadge = `<span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill">อนุมัติเกินงบจัดสรร ฿${Math.abs(fyRemaining).toLocaleString()}</span>`;
+        }
+
         return `
           <div class="col-md-3">
-            <div class="card p-3 card-stat shadow-sm bg-white">
+            <div class="card p-3 card-stat shadow-sm bg-white h-100 border">
               <div class="d-flex justify-content-between align-items-center">
                 <span class="badge bg-primary-subtle text-primary border rounded-pill px-3 py-1">ปีงบฯ ${fy.fiscal_year}</span>
                 <small class="text-muted">${fyProjects.length} โครงการ</small>
               </div>
               <small class="text-muted mt-2 d-block">งบจัดสรรตามแผน</small>
-              <h4 class="fw-bold mt-1">฿${Number(fy.allocated_budget).toLocaleString()}</h4>
+              <h4 class="fw-bold mt-1 text-dark">฿${fyAllocated.toLocaleString()}</h4>
               <div class="d-flex justify-content-between small border-top pt-2 mt-2">
                 <span class="text-success fw-medium">อนุมัติแล้ว ฿${fyAppr.toLocaleString()}</span>
                 <span class="text-warning fw-medium">เบิกจ่ายจริง ฿${fySpent.toLocaleString()}</span>
+              </div>
+              <div class="border-top pt-2 mt-2 text-center">
+                ${remainingBadge}
               </div>
             </div>
           </div>
@@ -967,7 +986,6 @@
           roleBadge = `<span class="badge bg-light text-dark border rounded-pill px-3 py-1">${u.role}</span>`;
         }
 
-        // ป้ายแสดงขอบเขตโครงการ
         const scopeBadge = u.project_scope === 'all'
           ? '<span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-1">ทุกโครงการ</span>'
           : '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill px-2 py-1">เฉพาะโครงการตนเอง</span>';
@@ -1190,7 +1208,7 @@
         document.getElementById('p-remarks').value = '';
         document.getElementById('p-resp').disabled = false;
 
-        // หากเป็นผู้ใช้ทั่วไป ค่าเริ่มต้นผู้รับผิดชอบจะเลือกเป็นตัวเอง
+        // ค่าเริ่มต้นเลือกตนเองเป็นผู้รับผิดชอบ
         if (state.user && state.user.project_scope === 'own') {
           document.getElementById('p-resp').value = state.user.user_id;
         }
@@ -1337,7 +1355,6 @@
         document.getElementById('lbl-username').innerText = state.user.name;
         document.getElementById('lbl-role').innerText = state.user.role;
         
-        // แสดงป้ายบอก Scope ปัจจุบัน
         const scopeText = (state.user.project_scope === 'all' || state.user.role === 'Admin') 
           ? 'ทุกโครงการ' 
           : 'เฉพาะโครงการตนเอง';
